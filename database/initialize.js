@@ -1,18 +1,18 @@
 const sqlite3 = require('sqlite3').verbose();
 
-// Create a database connection
-const db = new sqlite3.Database('./database/prometheus.db', (err) => {
+// Create a database connection for the main application
+const mainDb = new sqlite3.Database('./database/prometheus.db', (err) => {
     if (err) {
-        console.error("Error opening database:", err.message);
+        console.error("Error opening main database:", err.message);
     } else {
-        console.log("Connected to the SQLite database.");
+        console.log("Connected to the main SQLite database.");
     }
 });
 
-// Define the schema
-db.serialize(() => {
+// Define schema for main database
+mainDb.serialize(() => {
     // Create users table
-    db.run(`
+    mainDb.run(`
         CREATE TABLE IF NOT EXISTS users (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             hash TEXT UNIQUE NOT NULL,
@@ -21,7 +21,7 @@ db.serialize(() => {
     `);
 
     // Create messages table
-    db.run(`
+    mainDb.run(`
         CREATE TABLE IF NOT EXISTS messages (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             sender_hash TEXT NOT NULL,
@@ -34,14 +34,71 @@ db.serialize(() => {
         );
     `);
 
-    console.log("Database tables created successfully.");
+    console.log("Main database tables created successfully.");
 });
 
-// Close the database connection
-db.close((err) => {
+mainDb.close((err) => {
     if (err) {
-        console.error("Error closing database:", err.message);
+        console.error("Error closing main database:", err.message);
     } else {
-        console.log("Database connection closed.");
+        console.log("Main database connection closed.");
+    }
+});
+
+// Create a database connection for notes
+const notesDb = new sqlite3.Database('./database/notes.db', (err) => {
+    if (err) {
+        console.error("Error opening notes database:", err.message);
+    } else {
+        console.log("Connected to the Notes SQLite database.");
+    }
+});
+
+// Define schema for notes database
+notesDb.serialize(() => {
+    // Create notes table
+    notesDb.run(`
+        CREATE TABLE IF NOT EXISTS notes (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_hash TEXT NOT NULL,
+            title TEXT NOT NULL,
+            body TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        );
+    `);
+
+    // Create todos table
+    notesDb.run(`
+        CREATE TABLE IF NOT EXISTS todos (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_hash TEXT NOT NULL,
+            task TEXT NOT NULL,
+            completed BOOLEAN DEFAULT 0,
+            verification TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_hash) REFERENCES users (hash)
+        );
+    `);
+
+    // Create journals table
+    notesDb.run(`
+        CREATE TABLE IF NOT EXISTS journals (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_hash TEXT NOT NULL,
+            text_entry TEXT,
+            voice_entry TEXT,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_hash) REFERENCES users (hash)
+        );
+    `);
+
+    console.log("Notes database tables created successfully.");
+});
+
+notesDb.close((err) => {
+    if (err) {
+        console.error("Error closing notes database:", err.message);
+    } else {
+        console.log("Notes database connection closed.");
     }
 });

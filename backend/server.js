@@ -10,21 +10,31 @@ const PORT = 3001;
 app.use(bodyParser.json());
 app.use(cors());
 
-// Database connection
-const db = new sqlite3.Database('./database/prometheus.db', (err) => {
+// Main database connection
+const mainDb = new sqlite3.Database('./database/prometheus.db', (err) => {
     if (err) {
-        console.error("Error connecting to database:", err.message);
+        console.error("Error connecting to main database:", err.message);
     } else {
-        console.log("Connected to the SQLite database.");
+        console.log("Connected to the main SQLite database.");
     }
 });
 
-// Routes
+// Notes database connection
+const notesDb = new sqlite3.Database('./database/notes.db', (err) => {
+    if (err) {
+        console.error("Error connecting to notes database:", err.message);
+    } else {
+        console.log("Connected to the Notes SQLite database.");
+    }
+});
 
-// 1. Get all users
+// Main Routes (Users and Messages)
+
+// Retrieve all users
 app.get('/users', (req, res) => {
-    db.all("SELECT * FROM users;", [], (err, rows) => {
+    mainDb.all("SELECT * FROM users;", [], (err, rows) => {
         if (err) {
+            console.error("Error retrieving users:", err.message);
             res.status(500).json({ error: err.message });
         } else {
             res.json(rows);
@@ -32,14 +42,15 @@ app.get('/users', (req, res) => {
     });
 });
 
-// 2. Get all messages for a specific user
+// Retrieve all messages for a user
 app.get('/messages/:hash', (req, res) => {
     const { hash } = req.params;
-    db.all(
+    mainDb.all(
         "SELECT * FROM messages WHERE receiver_hash = ?;",
         [hash],
         (err, rows) => {
             if (err) {
+                console.error("Error retrieving messages:", err.message);
                 res.status(500).json({ error: err.message });
             } else {
                 res.json(rows);
@@ -48,17 +59,18 @@ app.get('/messages/:hash', (req, res) => {
     );
 });
 
-// 3. Send a message
+// Send a new message
 app.post('/messages', (req, res) => {
     const { sender_hash, receiver_hash, message } = req.body;
-    const expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString(); // 5 minutes from now
+    const expires_at = new Date(Date.now() + 5 * 60 * 1000).toISOString();
 
-    db.run(
+    mainDb.run(
         `INSERT INTO messages (sender_hash, receiver_hash, message, expires_at)
          VALUES (?, ?, ?, ?);`,
         [sender_hash, receiver_hash, message, expires_at],
         function (err) {
             if (err) {
+                console.error("Error sending message:", err.message);
                 res.status(500).json({ error: err.message });
             } else {
                 res.json({ id: this.lastID, sender_hash, receiver_hash, message, expires_at });
@@ -67,52 +79,17 @@ app.post('/messages', (req, res) => {
     );
 });
 
-// 4. Delete a message
-app.delete('/messages/:id', (req, res) => {
-    const { id } = req.params;
+// Notes Routes
 
-    db.run(
-        "DELETE FROM messages WHERE id = ?;",
-        [id],
-        function (err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json({ deletedID: id });
-            }
-        }
-    );
-});
-
-// Fetch contacts (users who have sent messages to the current user)
-app.get('/contacts/:hash', (req, res) => {
+// Retrieve all notes for a user
+app.get('/notes/:hash', (req, res) => {
     const { hash } = req.params;
-
-    db.all(
-        `SELECT DISTINCT sender_hash FROM messages WHERE receiver_hash = ?`,
+    notesDb.all(
+        "SELECT * FROM notes WHERE user_hash = ?;",
         [hash],
         (err, rows) => {
             if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json(rows.map(row => row.sender_hash));
-            }
-        }
-    );
-});
-
-// Fetch live messages for a specific user pair
-app.get('/live-messages/:sender_hash/:receiver_hash', (req, res) => {
-    const { sender_hash, receiver_hash } = req.params;
-
-    db.all(
-        `SELECT * FROM live_messages
-         WHERE (sender_hash = ? AND receiver_hash = ?)
-         OR (sender_hash = ? AND receiver_hash = ?)
-         ORDER BY sent_at ASC`,
-        [sender_hash, receiver_hash, receiver_hash, sender_hash],
-        (err, rows) => {
-            if (err) {
+                console.error("Error retrieving notes:", err.message);
                 res.status(500).json({ error: err.message });
             } else {
                 res.json(rows);
@@ -121,58 +98,80 @@ app.get('/live-messages/:sender_hash/:receiver_hash', (req, res) => {
     );
 });
 
-// Send a live message
-app.post('/live-messages', (req, res) => {
-    const { sender_hash, receiver_hash, message, message_type } = req.body;
-
-    db.run(
-        `INSERT INTO live_messages (sender_hash, receiver_hash, message, message_type)
-         VALUES (?, ?, ?, ?);`,
-        [sender_hash, receiver_hash, message, message_type || 'text'],
+// Create a new note
+app.post('/notes', (req, res) => {
+    const { user_hash, title, body } = req.body;
+    notesDb.run(
+        `INSERT INTO notes (user_hash, title, body)
+         VALUES (?, ?, ?);`,
+        [user_hash, title, body],
         function (err) {
             if (err) {
+                console.error("Error creating note:", err.message);
                 res.status(500).json({ error: err.message });
             } else {
-                res.json({
-                    id: this.lastID,
-                    sender_hash,
-                    receiver_hash,
-                    message,
-                    sent_at: new Date().toISOString(),
-                    message_type: message_type || 'text',
-                });
+                res.json({ id: this.lastID, user_hash, title, body });
             }
         }
     );
 });
 
-// Auto-delete only live messages older than 20 minutes
-setInterval(() => {
-    db.run(
-        `DELETE FROM live_messages WHERE sent_at <= DATETIME('now', '-20 minutes')`,
-        [],
-        (err) => {
+// Edit a note
+app.put('/notes/:id', (req, res) => {
+    const { id } = req.params;
+    const { title, body } = req.body;
+
+    notesDb.run(
+        `UPDATE notes SET title = ?, body = ? WHERE id = ?;`,
+        [title, body, id],
+        function (err) {
             if (err) {
-                console.error("Error deleting old live messages:", err.message);
+                console.error("Error updating note:", err.message);
+                res.status(500).json({ error: err.message });
             } else {
-                console.log("Old live messages deleted successfully.");
+                res.json({ updatedID: id, title, body });
             }
         }
     );
-}, 5 * 60 * 1000); // Run every 5 minutes
+});
+
+// Delete a note
+app.delete('/notes/:id', (req, res) => {
+    const { id } = req.params;
+
+    notesDb.run(
+        "DELETE FROM notes WHERE id = ?;",
+        [id],
+        function (err) {
+            if (err) {
+                console.error("Error deleting note:", err.message);
+                res.status(500).json({ error: err.message });
+            } else {
+                res.json({ deletedID: id });
+            }
+        }
+    );
+});
 
 // Start the server
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
 
-// Close database on exit
+// Close databases on exit
 process.on('SIGINT', () => {
-    db.close((err) => {
+    mainDb.close((err) => {
         if (err) {
-            console.error("Error closing database:", err.message);
+            console.error("Error closing main database:", err.message);
         } else {
-            console.log("Database connection closed.");
+            console.log("Main database connection closed.");
+        }
+    });
+    notesDb.close((err) => {
+        if (err) {
+            console.error("Error closing notes database:", err.message);
+        } else {
+            console.log("Notes database connection closed.");
         }
         process.exit();
     });
