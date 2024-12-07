@@ -12,7 +12,7 @@ function Messages() {
   useEffect(() => {
     const fetchMessages = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/messages/${userHash}`);
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/messages/${userHash}`);
         const data = await response.json();
         if (response.ok) setMessages(data);
         else console.error('Error fetching messages:', data.error);
@@ -23,7 +23,7 @@ function Messages() {
 
     const fetchContacts = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/contacts/${userHash}`);
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/contacts/${userHash}`);
         const data = await response.json();
         if (response.ok) setContacts(data);
         else console.error('Error fetching contacts:', data.error);
@@ -43,7 +43,7 @@ function Messages() {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/messages', {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -74,7 +74,9 @@ function Messages() {
         <div>
           <button onClick={() => navigate(`/live-messaging?hash=${userHash}`)}>Live Messaging</button>
           <button onClick={() => navigate('/settings')}>Settings</button>
-          <button onClick={() => alert('You will be able to securely keep notes!  (You will be compensated if the system gets hacked, you lose, we lose)')}>Notes</button>
+          <button onClick={() => alert('You will be able to securely keep notes! (You will be compensated if the system gets hacked, you lose, we lose)')}>
+            Notes
+          </button>
         </div>
       </header>
 

@@ -4,14 +4,15 @@ const bodyParser = require('body-parser');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3001;
+const PORT = process.env.PORT || 3001; // Support for Render's dynamic port assignment
 
 // Middleware
 app.use(bodyParser.json());
 app.use(cors());
 
 // Database connection
-const db = new sqlite3.Database('./database/prometheus.db', (err) => {
+const dbPath = process.env.DATABASE_PATH || './database/prometheus.db'; // Support for env variable
+const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
         console.error("Error connecting to database:", err.message);
     } else {
@@ -89,7 +90,7 @@ app.get('/contacts/:hash', (req, res) => {
     const { hash } = req.params;
 
     db.all(
-        `SELECT DISTINCT sender_hash FROM messages WHERE receiver_hash = ?`,
+        `SELECT DISTINCT sender_hash FROM messages WHERE receiver_hash = ?;`,
         [hash],
         (err, rows) => {
             if (err) {
@@ -109,7 +110,7 @@ app.get('/live-messages/:sender_hash/:receiver_hash', (req, res) => {
         `SELECT * FROM live_messages
          WHERE (sender_hash = ? AND receiver_hash = ?)
          OR (sender_hash = ? AND receiver_hash = ?)
-         ORDER BY sent_at ASC`,
+         ORDER BY sent_at ASC;`,
         [sender_hash, receiver_hash, receiver_hash, sender_hash],
         (err, rows) => {
             if (err) {
@@ -149,7 +150,7 @@ app.post('/live-messages', (req, res) => {
 // Auto-delete only live messages older than 20 minutes
 setInterval(() => {
     db.run(
-        `DELETE FROM live_messages WHERE sent_at <= DATETIME('now', '-20 minutes')`,
+        `DELETE FROM live_messages WHERE sent_at <= DATETIME('now', '-20 minutes');`,
         [],
         (err) => {
             if (err) {

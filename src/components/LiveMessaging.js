@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 
 function LiveMessaging() {
   const [contacts, setContacts] = useState([]);
@@ -8,15 +8,14 @@ function LiveMessaging() {
   const [colors, setColors] = useState({});
   const [isRecording, setIsRecording] = useState(false);
   const [mediaRecorder, setMediaRecorder] = useState(null);
-  const [audioBlob, setAudioBlob] = useState(null);
 
   const userHash = new URLSearchParams(window.location.search).get('hash');
 
+  // Fetch contacts
   useEffect(() => {
-    // Fetch contacts (users who have sent messages to the current user)
     const fetchContacts = async () => {
       try {
-        const response = await fetch(`http://localhost:3001/contacts/${userHash}`);
+        const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/contacts/${userHash}`);
         const data = await response.json();
         if (response.ok) {
           setContacts(data);
@@ -37,24 +36,26 @@ function LiveMessaging() {
     fetchContacts();
   }, [userHash]);
 
-  const fetchLiveMessages = async () => {
+  // Fetch live messages
+  const fetchLiveMessages = useCallback(async () => {
     try {
-      const response = await fetch(`http://localhost:3001/live-messages/${userHash}/${selectedContact}`);
+      const response = await fetch(
+        `${process.env.REACT_APP_BACKEND_URL}/live-messages/${userHash}/${selectedContact}`
+      );
       const data = await response.json();
       if (response.ok) setChat(data);
       else console.error('Error fetching live messages:', data.error);
     } catch (err) {
       console.error('Error fetching live messages:', err);
     }
-  };
+  }, [userHash, selectedContact]);
 
   useEffect(() => {
     if (selectedContact) fetchLiveMessages();
 
-    // Auto-delete messages after 20 minutes
     const autoDelete = setTimeout(() => setChat([]), 20 * 60 * 1000);
     return () => clearTimeout(autoDelete);
-  }, [selectedContact, chat]);
+  }, [selectedContact, fetchLiveMessages]);
 
   const handleSendMessage = async () => {
     if (!selectedContact || !message.trim()) {
@@ -63,7 +64,7 @@ function LiveMessaging() {
     }
 
     try {
-      const response = await fetch('http://localhost:3001/live-messages', {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/live-messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -91,11 +92,10 @@ function LiveMessaging() {
       return;
     }
 
-    // Simulate image upload (in a real app, you'd upload to a storage service)
     const imageUrl = URL.createObjectURL(file);
 
     try {
-      const response = await fetch('http://localhost:3001/live-messages', {
+      const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/live-messages`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -129,12 +129,10 @@ function LiveMessaging() {
 
       recorder.onstop = async () => {
         const blob = new Blob(chunks, { type: 'audio/mpeg' });
-        setAudioBlob(blob);
-
         const audioUrl = URL.createObjectURL(blob);
 
         try {
-          const response = await fetch('http://localhost:3001/live-messages', {
+          const response = await fetch(`${process.env.REACT_APP_BACKEND_URL}/live-messages`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -181,26 +179,23 @@ function LiveMessaging() {
       </header>
 
       <section className="chat-window">
-  {chat.map((msg, index) => (
-    <div
-      key={index}
-      className={msg.sender_hash === userHash ? 'message-sent' : 'message-received'}
-      style={{ backgroundColor: colors[msg.sender_hash] || '#f1f1f1' }}
-    >
-      {msg.message_type === 'text' && (
-        <p style={{ color: 'black', fontWeight: 'bold' }}>{msg.message}</p>
-      )}
-      {msg.message_type === 'image' && <img src={msg.message} alt="Sent media" />}
-      {msg.message_type === 'voice' && (
-        <audio controls>
-          <source src={msg.message} type="audio/mpeg" />
-          Your browser does not support the audio element.
-        </audio>
-      )}
-    </div>
-  ))}
-</section>
-
+        {chat.map((msg, index) => (
+          <div
+            key={index}
+            className={msg.sender_hash === userHash ? 'message-sent' : 'message-received'}
+            style={{ backgroundColor: colors[msg.sender_hash] || '#f1f1f1' }}
+          >
+            {msg.message_type === 'text' && <p>{msg.message}</p>}
+            {msg.message_type === 'image' && <img src={msg.message} alt="Sent media" />}
+            {msg.message_type === 'voice' && (
+              <audio controls>
+                <source src={msg.message} type="audio/mpeg" />
+                Your browser does not support the audio element.
+              </audio>
+            )}
+          </div>
+        ))}
+      </section>
 
       <section className="chat-input">
         <textarea
@@ -210,11 +205,7 @@ function LiveMessaging() {
         />
         <button onClick={handleSendMessage}>Send</button>
         <div>
-          <input
-            type="file"
-            accept="image/*"
-            onChange={handleSendImage}
-          />
+          <input type="file" accept="image/*" onChange={handleSendImage} />
           {!isRecording ? (
             <button onClick={handleStartRecording}>Start Recording</button>
           ) : (
