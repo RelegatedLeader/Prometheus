@@ -4,54 +4,56 @@ function Settings() {
   const [language, setLanguage] = useState('English');
   const [darkMode, setDarkMode] = useState(false);
 
-  // Text translations for UI elements
+  // Translations for the settings labels
   const translations = {
     English: {
-      title: 'Settings',
+      heading: 'Settings',
       language: 'Language',
       selectLanguage: 'Select Language:',
-      nightMode: 'Night Mode',
-      enableNightMode: 'Enable Night Mode:',
+      darkMode: 'Enable Dark Mode:',
     },
     French: {
-      title: 'Paramètres',
+      heading: 'Paramètres',
       language: 'Langue',
-      selectLanguage: 'Choisir la langue:',
-      nightMode: 'Mode Nuit',
-      enableNightMode: 'Activer le mode nuit:',
+      selectLanguage: 'Choisir la langue :',
+      darkMode: 'Activer le mode sombre :',
     },
     Spanish: {
-      title: 'Configuración',
+      heading: 'Configuraciones',
       language: 'Idioma',
       selectLanguage: 'Seleccionar idioma:',
-      nightMode: 'Modo Nocturno',
-      enableNightMode: 'Activar el modo nocturno:',
+      darkMode: 'Activar modo oscuro:',
     },
   };
 
   // Handle language change
   const handleLanguageChange = (event) => {
-    setLanguage(event.target.value);
+    const selectedLanguage = event.target.value;
+    setLanguage(selectedLanguage);
+    document.documentElement.lang = selectedLanguage === 'English' ? 'en' : 
+                                      selectedLanguage === 'French' ? 'fr' : 'es';
+    alert(`Language changed to ${selectedLanguage}`);
   };
 
   // Toggle dark mode
   const toggleDarkMode = () => {
-    setDarkMode(!darkMode);
-    document.body.style.backgroundColor = darkMode ? '#fff' : '#2E2422';
-    document.body.style.color = darkMode ? '#000' : '#fff';
+    const isDarkMode = !darkMode;
+    setDarkMode(isDarkMode);
+    document.body.style.backgroundColor = isDarkMode ? '#2E2422' : '#fff';
+    document.body.style.color = isDarkMode ? '#fff' : '#000';
   };
 
-  // Get current translations
-  const currentText = translations[language];
+  // Get the translations for the current language
+  const t = translations[language];
 
   return (
     <div className="Settings">
-      <h1>{currentText.title}</h1>
+      <h1>{t.heading}</h1>
 
       {/* Language Settings */}
       <section>
-        <h2>{currentText.language}</h2>
-        <label htmlFor="languageSelect">{currentText.selectLanguage}</label>
+        <h2>{t.language}</h2>
+        <label htmlFor="languageSelect">{t.selectLanguage}</label>
         <select id="languageSelect" value={language} onChange={handleLanguageChange}>
           <option value="English">English</option>
           <option value="French">French</option>
@@ -59,10 +61,10 @@ function Settings() {
         </select>
       </section>
 
-      {/* Night Mode Settings */}
+      {/* Dark Mode Settings */}
       <section>
-        <h2>{currentText.nightMode}</h2>
-        <label htmlFor="darkModeToggle">{currentText.enableNightMode}</label>
+        <h2>{t.darkMode}</h2>
+        <label htmlFor="darkModeToggle">{t.darkMode}</label>
         <input
           id="darkModeToggle"
           type="checkbox"
@@ -75,3 +77,4 @@ function Settings() {
 }
 
 export default Settings;
+

@@ -14,8 +14,7 @@ function App() {
         <Route path="/new-user" element={<NewUser />} />
         <Route path="/messages" element={<Messages />} />
         <Route path="/live-messaging" element={<LiveMessaging />} /> {/* Add route for LiveMessaging */}
-        <Route path="/settings" element={<Settings />} />
-
+      <Route path='/settings' element={<Settings />} />
       </Routes>
     </Router>
   );

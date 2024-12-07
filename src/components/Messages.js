@@ -74,7 +74,7 @@ function Messages() {
         <div>
           <button onClick={() => navigate(`/live-messaging?hash=${userHash}`)}>Live Messaging</button>
           <button onClick={() => navigate('/settings')}>Settings</button>
-          <button onClick={() => alert('You will be able to securely keep notes! (We will compensate you if the system gets hacked, you loose, we loose)')}>Notes</button>
+          <button onClick={() => alert('You will be able to securely keep notes!  (You will be compensated if the system gets hacked, you lose, we lose)')}>Notes</button>
         </div>
       </header>
 
