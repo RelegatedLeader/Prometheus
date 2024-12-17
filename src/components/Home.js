@@ -3,22 +3,29 @@ import { useNavigate } from 'react-router-dom';
 
 function Home() {
   const [hash, setHash] = useState('');
-  const [lastClickTime, setLastClickTime] = useState(0);
+  const [holdTimeout, setHoldTimeout] = useState(null);
   const navigate = useNavigate();
 
-  const handleDoubleClick = () => {
-    const currentTime = new Date().getTime();
-    const timeDifference = currentTime - lastClickTime;
-
-    if (timeDifference < 500) {
+  const handleButtonPress = () => {
+    const timeout = setTimeout(() => {
       alert('New User Detected');
       navigate('/new-user');
-    } else if (hash.trim()) {
-      // Proceed if hash exists
-      navigate(`/messages?hash=${hash.trim()}`);
-    } 
+    }, 5000); // 5 seconds hold time
 
-    setLastClickTime(currentTime);
+    setHoldTimeout(timeout);
+  };
+
+  const handleButtonRelease = () => {
+    if (holdTimeout) {
+      clearTimeout(holdTimeout);
+      setHoldTimeout(null);
+
+      if (hash.trim()) { //makes sure that the hash is not empty before navigating to the messages page
+        navigate(`/messages?hash=${hash.trim()}`); //the ? is for the string query 
+      } else {
+        alert('Please enter your unique hash');
+      }
+    }
   };
 
   return (
@@ -32,7 +39,14 @@ function Home() {
         value={hash}
         onChange={(e) => setHash(e.target.value)}
       />
-      <button onClick={handleDoubleClick}>Get in</button>
+      <button
+        onMouseDown={handleButtonPress}
+        onMouseUp={handleButtonRelease}
+        onTouchStart={handleButtonPress}
+        onTouchEnd={handleButtonRelease}
+      >
+        Get in
+      </button>
     </div>
   );
 }

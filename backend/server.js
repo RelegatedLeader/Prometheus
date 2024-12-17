@@ -2,8 +2,18 @@ const express = require('express');
 const sqlite3 = require('sqlite3').verbose();
 const bodyParser = require('body-parser');
 const cors = require('cors');
+const http = require('http'); // Required to create server for Socket.IO
+const { Server } = require('socket.io'); // Import Socket.IO
 
 const app = express();
+const server = http.createServer(app); // Create server instance for Socket.IO
+const io = new Server(server, {
+    cors: {
+        origin: '*', // Allow all origins for development purposes
+        methods: ['GET', 'POST', 'DELETE'],
+    },
+});
+
 const PORT = process.env.PORT || 3001; // Support for Render's dynamic port assignment
 
 // Middleware
@@ -25,11 +35,8 @@ const db = new sqlite3.Database(dbPath, (err) => {
 // 1. Get all users
 app.get('/users', (req, res) => {
     db.all("SELECT * FROM users;", [], (err, rows) => {
-        if (err) {
-            res.status(500).json({ error: err.message });
-        } else {
-            res.json(rows);
-        }
+        if (err) res.status(500).json({ error: err.message });
+        else res.json(rows);
     });
 });
 
@@ -40,11 +47,8 @@ app.get('/messages/:hash', (req, res) => {
         "SELECT * FROM messages WHERE receiver_hash = ?;",
         [hash],
         (err, rows) => {
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json(rows);
-            }
+            if (err) res.status(500).json({ error: err.message });
+            else res.json(rows);
         }
     );
 });
@@ -59,11 +63,8 @@ app.post('/messages', (req, res) => {
          VALUES (?, ?, ?, ?);`,
         [sender_hash, receiver_hash, message, expires_at],
         function (err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json({ id: this.lastID, sender_hash, receiver_hash, message, expires_at });
-            }
+            if (err) res.status(500).json({ error: err.message });
+            else res.json({ id: this.lastID, sender_hash, receiver_hash, message, expires_at });
         }
     );
 });
@@ -71,41 +72,32 @@ app.post('/messages', (req, res) => {
 // 4. Delete a message
 app.delete('/messages/:id', (req, res) => {
     const { id } = req.params;
-
     db.run(
         "DELETE FROM messages WHERE id = ?;",
         [id],
         function (err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json({ deletedID: id });
-            }
+            if (err) res.status(500).json({ error: err.message });
+            else res.json({ deletedID: id });
         }
     );
 });
 
-// Fetch contacts (users who have sent messages to the current user)
+// 5. Fetch contacts (users who have sent messages to the current user)
 app.get('/contacts/:hash', (req, res) => {
     const { hash } = req.params;
-
     db.all(
         `SELECT DISTINCT sender_hash FROM messages WHERE receiver_hash = ?;`,
         [hash],
         (err, rows) => {
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json(rows.map(row => row.sender_hash));
-            }
+            if (err) res.status(500).json({ error: err.message });
+            else res.json(rows.map(row => row.sender_hash));
         }
     );
 });
 
-// Fetch live messages for a specific user pair
+// 6. Fetch live messages for a specific user pair
 app.get('/live-messages/:sender_hash/:receiver_hash', (req, res) => {
     const { sender_hash, receiver_hash } = req.params;
-
     db.all(
         `SELECT * FROM live_messages
          WHERE (sender_hash = ? AND receiver_hash = ?)
@@ -113,35 +105,37 @@ app.get('/live-messages/:sender_hash/:receiver_hash', (req, res) => {
          ORDER BY sent_at ASC;`,
         [sender_hash, receiver_hash, receiver_hash, sender_hash],
         (err, rows) => {
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json(rows);
-            }
+            if (err) res.status(500).json({ error: err.message });
+            else res.json(rows);
         }
     );
 });
 
-// Send a live message
+// 7. Send a live message
 app.post('/live-messages', (req, res) => {
     const { sender_hash, receiver_hash, message, message_type } = req.body;
+    const sent_at = new Date().toISOString();
 
     db.run(
-        `INSERT INTO live_messages (sender_hash, receiver_hash, message, message_type)
-         VALUES (?, ?, ?, ?);`,
-        [sender_hash, receiver_hash, message, message_type || 'text'],
+        `INSERT INTO live_messages (sender_hash, receiver_hash, message, message_type, sent_at)
+         VALUES (?, ?, ?, ?, ?);`,
+        [sender_hash, receiver_hash, message, message_type || 'text', sent_at],
         function (err) {
-            if (err) {
-                res.status(500).json({ error: err.message });
-            } else {
-                res.json({
+            if (err) res.status(500).json({ error: err.message });
+            else {
+                const newMessage = {
                     id: this.lastID,
                     sender_hash,
                     receiver_hash,
                     message,
-                    sent_at: new Date().toISOString(),
+                    sent_at,
                     message_type: message_type || 'text',
-                });
+                };
+
+                // Emit the message to connected users in real-time
+                io.emit('receiveMessage', newMessage);
+
+                res.json(newMessage);
             }
         }
     );
@@ -153,28 +147,36 @@ setInterval(() => {
         `DELETE FROM live_messages WHERE sent_at <= DATETIME('now', '-20 minutes');`,
         [],
         (err) => {
-            if (err) {
-                console.error("Error deleting old live messages:", err.message);
-            } else {
-                console.log("Old live messages deleted successfully.");
-            }
+            if (err) console.error("Error deleting old live messages:", err.message);
+            else console.log("Old live messages deleted successfully.");
         }
     );
 }, 5 * 60 * 1000); // Run every 5 minutes
 
+// Socket.IO Real-Time Communication
+io.on('connection', (socket) => {
+    console.log(`A user connected: ${socket.id}`);
+
+    // Listen for sendMessage events from clients
+    socket.on('sendMessage', (data) => {
+        io.emit('receiveMessage', data); // Broadcast the message to all connected clients
+    });
+
+    socket.on('disconnect', () => {
+        console.log(`A user disconnected: ${socket.id}`);
+    });
+});
+
 // Start the server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
 
 // Close database on exit
 process.on('SIGINT', () => {
     db.close((err) => {
-        if (err) {
-            console.error("Error closing database:", err.message);
-        } else {
-            console.log("Database connection closed.");
-        }
+        if (err) console.error("Error closing database:", err.message);
+        else console.log("Database connection closed.");
         process.exit();
     });
 });
