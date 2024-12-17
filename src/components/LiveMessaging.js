@@ -62,11 +62,19 @@ function LiveMessaging() {
       fetchLiveMessages();
       socket.emit('joinRoom', { userHash, contact: selectedContact });
 
+      // Listen for real-time updates
       socket.on('receiveMessage', (newMessage) => {
-        setChat((prevChat) => [...prevChat, newMessage]); // Append new messages
+        // Avoid duplicates by checking message ID
+        setChat((prevChat) => {
+          if (!prevChat.find((msg) => msg.id === newMessage.id)) {
+            return [...prevChat, newMessage];
+          }
+          return prevChat;
+        });
       });
     }
 
+    // Cleanup socket listener
     return () => {
       socket.off('receiveMessage');
     };
@@ -93,8 +101,9 @@ function LiveMessaging() {
 
       const data = await response.json();
       if (response.ok) {
-        socket.emit('sendMessage', data); // Emit message to server for real-time updates
-        setMessage('');
+        // Emit message to server for real-time updates
+        socket.emit('sendMessage', data);
+        setMessage(''); // Clear message input
       } else {
         console.error('Error sending message:', data.error);
       }
