@@ -97,7 +97,7 @@ function Messages() {
       </section>
 
       <section>
-        <h2>Send a Message</h2>
+        <h2>Send a Message to add people back and unlock features with them</h2>
         <div>
           <label htmlFor="recipient-hash">Recipient's Hash:</label>
           <input

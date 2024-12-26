@@ -194,9 +194,12 @@ function LiveMessaging() {
           onChange={(e) => setMessage(e.target.value)}
         />
         <button onClick={handleSendMessage}>Send</button>
-        <div>
+    
+       {/** 
+        * to add images, need to be fixed...
+        * <div>
           <input type="file" accept="image/*" onChange={handleSendImage} />
-        </div>
+        </div> */}
       </section>
     </div>
   );

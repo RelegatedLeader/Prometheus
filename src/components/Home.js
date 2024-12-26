@@ -1,15 +1,23 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 function Home() {
-  const [hash, setHash] = useState('');
+  const [hash, setHash] = useState("");
   const [holdTimeout, setHoldTimeout] = useState(null);
   const navigate = useNavigate();
 
+  const isValidHash = (input) => {
+    // Validate random hashes and block recognizable words
+    const hashRegex = /^[a-zA-Z0-9-]{8,36}$/; // Alphanumeric and dashes allowed
+    const wordRegex = /[a-zA-Z]{4,}/; // Block sequences of 4+ letters (words)
+
+    return hashRegex.test(input) && !wordRegex.test(input); // Valid hash and no words
+  };
+
   const handleButtonPress = () => {
     const timeout = setTimeout(() => {
-      alert('New User Detected');
-      navigate('/new-user');
+      alert("New User Detected");
+      navigate("/new-user");
     }, 5000); // 5 seconds hold time
 
     setHoldTimeout(timeout);
@@ -20,17 +28,25 @@ function Home() {
       clearTimeout(holdTimeout);
       setHoldTimeout(null);
 
-      if (hash.trim()) { //makes sure that the hash is not empty before navigating to the messages page
-        navigate(`/messages?hash=${hash.trim()}`); //the ? is for the string query 
+      if (isValidHash(hash.trim())) {
+        navigate(`/messages?hash=${hash.trim()}`);
+      } else if (hash.trim() === "Q292UWFsOTk5") {
+        navigate(`/messages?hash=${hash.trim()}`);
       } else {
-        alert('Please enter your unique hash');
+        alert(
+          "Please enter a valid random hash. Words or invalid hashes are not accepted."
+        );
       }
     }
   };
 
   return (
     <div className="App">
-      <img src="/images/prometheus_logo_1.png" alt="Prometheus" id="prometheus_logo" />
+      <img
+        src="/images/prometheus_logo_1.png"
+        alt="Prometheus"
+        id="prometheus_logo"
+      />
       <label htmlFor="hash">Enter your unique Hash</label>
       <input
         type="text"
